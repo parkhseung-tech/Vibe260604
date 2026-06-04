@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML5 Tetris</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --grid: #16213e;
+      --border: #1d3b6c;
+      --text: #eaf7ff;
+      --active: #fdd835;
+      --ghost: rgba(255, 255, 255, 0.18);
+      --panel: rgba(7, 14, 31, 0.85);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top, #1b2a4a 0%, #0b0f19 60%);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 320px 220px;
+      gap: 20px;
+      width: min(100%, 720px);
+    }
+
+    .board {
+      position: relative;
+      width: 320px;
+      height: 640px;
+      background: linear-gradient(180deg, var(--grid) 0%, #17213c 100%);
+      border: 4px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(20, 1fr);
+      gap: 2px;
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.04), transparent 36%);
+    }
+
+    .cell {
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+      transition: background 0.12s ease;
+    }
+
+    .cell.filled {
+      background: var(--active);
+      box-shadow: inset 0 0 12px rgba(255, 219, 88, 0.65), 0 0 12px rgba(255, 219, 88, 0.35);
+    }
+
+    .cell.ghost {
+      background: var(--ghost);
+    }
+
+    .panel {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      background: var(--panel);
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      min-height: 640px;
+    }
+
+    .panel h1 {
+      font-size: 1.6rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .scoreboard,
+    .next-preview,
+    .controls {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+    }
+
+    .scoreboard div,
+    .controls div,
+    .next-preview .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .next-preview {
+      padding-bottom: 18px;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 6px;
+      width: 100%;
+      max-width: 160px;
+      margin: 0 auto;
+      padding: 8px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+    }
+
+    .preview-cell {
+      width: 100%;
+      aspect-ratio: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      transition: background 0.12s ease;
+    }
+
+    .preview-cell.filled {
+      background: var(--active);
+      box-shadow: inset 0 0 10px rgba(255, 219, 88, 0.45);
+    }
+
+    .label {
+      color: #9ab9ff;
+      font-size: 0.98rem;
+    }
+
+    .value {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      background: #1d3b6c;
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    button:hover,
+    button:focus {
+      background: #375bb5;
+      transform: translateY(-1px);
+    }
+
+    .controls p {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: #b8d0ff;
+    }
+
+    .hint {
+      font-size: 0.88rem;
+      color: #99a9c9;
+    }
+
+    .footer {
+      color: #7f9bd0;
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="board">
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <aside class="panel">
+      <div>
+        <h1>HTML5 Tetris</h1>
+        <div class="scoreboard">
+          <div><span class="label">Score</span><span id="score" class="value">0</span></div>
+          <div><span class="label">Level</span><span id="level" class="value">1</span></div>
+          <div><span class="label">Lines</span><span id="lines" class="value">0</span></div>
+        </div>
+
+        <div class="next-preview">
+          <div class="label-row"><span class="label">Next</span></div>
+          <div id="nextGrid" class="preview-grid"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div><span class="label">Move</span><span class="value">← →</span></div>
+        <div><span class="label">Rotate</span><span class="value">↑</span></div>
+        <div><span class="label">Soft Drop</span><span class="value">↓</span></div>
+        <div><span class="label">Hard Drop</span><span class="value">Space</span></div>
+        <button id="startBtn" type="button">Start / Restart</button>
+        <p class="hint">게임 시작 후 화살표 키로 조작하세요. 스페이스바로 블록을 빠르게 떨어뜨립니다.</p>
+      </div>
+
+      <div class="footer">HTML5 · CSS3 · JavaScript</div>
+    </aside>
+  </div>
+
+  <script>
+    const COLS = 10;
+    const ROWS = 20;
+    const BLOCK_SIZE = 32;
+    const POINTS = { 1: 40, 2: 100, 3: 300, 4: 1200 };
+    const LEVEL_SPEED = 800;
+
+    const COLORS = [
+      "#f44336",
+      "#ff9800",
+      "#ffeb3b",
+      "#4caf50",
+      "#2196f3",
+      "#9c27b0",
+      "#00bcd4"
+    ];
+
+    const SHAPES = [
+      [[1, 1, 1, 1]],
+      [[1, 1], [1, 1]],
+      [[0, 1, 1], [1, 1, 0]],
+      [[1, 1, 0], [0, 1, 1]],
+      [[1, 0, 0], [1, 1, 1]],
+      [[0, 0, 1], [1, 1, 1]],
+      [[0, 1, 0], [1, 1, 1]]
+    ];
+
+    const gridElement = document.getElementById("grid");
+    const nextGridElement = document.getElementById("nextGrid");
+    const scoreElement = document.getElementById("score");
+    const levelElement = document.getElementById("level");
+    const linesElement = document.getElementById("lines");
+    const startButton = document.getElementById("startBtn");
+
+    let grid = [];
+    let cells = [];
+    let previewCells = [];
+    let currentPiece;
+    let nextPiece;
+    let gameInterval;
+    let score = 0;
+    let level = 1;
+    let lines = 0;
+    let dropCounter = 0;
+    let isRunning = false;
+
+    function createGrid() {
+      gridElement.innerHTML = "";
+      cells = [];
+      for (let row = 0; row < ROWS; row++) {
+        grid[row] = [];
+        for (let col = 0; col < COLS; col++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          gridElement.appendChild(cell);
+          cells.push(cell);
+          grid[row][col] = 0;
+        }
+      }
+    }
+
+    function randomPiece() {
+      const index = Math.floor(Math.random() * SHAPES.length);
+      return {
+        shape: SHAPES[index],
+        color: COLORS[index],
+        x: Math.floor((COLS - SHAPES[index][0].length) / 2),
+        y: -1
+      };
+    }
+
+    function rotate(shape) {
+      return shape[0].map((_, index) => shape.map(row => row[index]).reverse());
+    }
+
+    function isValidPosition(piece, offsetX = 0, offsetY = 0) {
+      for (let row = 0; row < piece.shape.length; row++) {
+        for (let col = 0; col < piece.shape[row].length; col++) {
+          if (!piece.shape[row][col]) continue;
+          const x = piece.x + col + offsetX;
+          const y = piece.y + row + offsetY;
+          if (x < 0 || x >= COLS || y >= ROWS) return false;
+          if (y >= 0 && grid[y][x]) return false;
+        }
+      }
+      return true;
+    }
+
+    function mergePiece(piece) {
+      piece.shape.forEach((row, dy) => {
+        row.forEach((value, dx) => {
+          if (value && piece.y + dy >= 0) {
+            grid[piece.y + dy][piece.x + dx] = piece.color;
+          }
+        });
+      });
+    }
+
+    function clearLines() {
+      let linesCleared = 0;
+      for (let row = ROWS - 1; row >= 0; row--) {
+        if (grid[row].every(value => value)) {
+          grid.splice(row, 1);
+          grid.unshift(new Array(COLS).fill(0));
+          linesCleared++;
+          row++;
+        }
+      }
+      if (linesCleared > 0) {
+        lines += linesCleared;
+        score += POINTS[linesCleared] * level;
+        level = Math.floor(lines / 10) + 1;
+      }
+    }
+
+    function getGhostY(piece) {
+      const ghost = { ...piece, shape: piece.shape, x: piece.x, y: piece.y };
+      while (isValidPosition(ghost, 0, 1)) {
+        ghost.y++;
+      }
+      return ghost.y;
+    }
+
+    function drawGhost() {
+      if (!currentPiece) return;
+      const ghostY = getGhostY(currentPiece);
+      currentPiece.shape.forEach((row, dy) => {
+        row.forEach((value, dx) => {
+          if (!value) return;
+          const x = currentPiece.x + dx;
+          const y = ghostY + dy;
+          if (y >= 0) {
+            const index = y * COLS + x;
+            const cell = cells[index];
+            if (cell && !cell.classList.contains("filled")) {
+              cell.className = "cell ghost";
+            }
+          }
+        });
+      });
+    }
+
+    function draw() {
+      cells.forEach((cell, index) => {
+        const row = Math.floor(index / COLS);
+        const col = index % COLS;
+        const value = grid[row][col];
+        if (value) {
+          cell.className = "cell filled";
+          cell.style.background = value;
+        } else {
+          cell.className = "cell";
+          cell.style.background = "";
+        }
+      });
+
+      drawGhost();
+
+      if (currentPiece) {
+        currentPiece.shape.forEach((row, dy) => {
+          row.forEach((value, dx) => {
+            if (value) {
+              const x = currentPiece.x + dx;
+              const y = currentPiece.y + dy;
+              if (y >= 0) {
+                const index = y * COLS + x;
+                const cell = cells[index];
+                cell.className = "cell filled";
+                cell.style.background = currentPiece.color;
+              }
+            }
+          });
+        });
+      }
+
+      updatePreview();
+    }
+
+    function hardDrop() {
+      while (isValidPosition(currentPiece, 0, 1)) {
+        currentPiece.y++;
+      }
+      placePiece();
+    }
+
+    function placePiece() {
+      mergePiece(currentPiece);
+      clearLines();
+      updateStats();
+      currentPiece = nextPiece;
+      nextPiece = randomPiece();
+      if (!isValidPosition(currentPiece)) {
+        finishGame();
+      }
+      draw();
+    }
+
+    function finishGame() {
+      isRunning = false;
+      clearInterval(gameInterval);
+      alert(`게임 종료! 점수: ${score}`);
+    }
+
+    function updateStats() {
+      scoreElement.textContent = score;
+      levelElement.textContent = level;
+      linesElement.textContent = lines;
+    }
+
+    function updateTime() {
+      if (!isRunning) return;
+      if (isValidPosition(currentPiece, 0, 1)) {
+        currentPiece.y++;
+      } else {
+        placePiece();
+      }
+      draw();
+    }
+
+    function startGame() {
+      score = 0;
+      level = 1;
+      lines = 0;
+      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      currentPiece = randomPiece();
+      nextPiece = randomPiece();
+      isRunning = true;
+      updateStats();
+      updatePreview();
+      draw();
+      clearInterval(gameInterval);
+      gameInterval = setInterval(updateTime, Math.max(100, LEVEL_SPEED - (level - 1) * 50));
+    }
+
+    function changePiece(rotation) {
+      const rotated = { ...currentPiece, shape: rotate(currentPiece.shape) };
+      if (isValidPosition(rotated)) {
+        currentPiece.shape = rotated.shape;
+      }
+    }
+
+    function movePiece(offsetX) {
+      if (isValidPosition(currentPiece, offsetX, 0)) {
+        currentPiece.x += offsetX;
+      }
+    }
+
+    function createPreviewGrid() {
+      nextGridElement.innerHTML = "";
+      previewCells = [];
+      for (let i = 0; i < 16; i++) {
+        const cell = document.createElement("div");
+        cell.className = "preview-cell";
+        nextGridElement.appendChild(cell);
+        previewCells.push(cell);
+      }
+    }
+
+    function updatePreview() {
+      previewCells.forEach(cell => {
+        cell.className = "preview-cell";
+        cell.style.background = "";
+      });
+
+      if (!nextPiece) return;
+      const shape = nextPiece.shape;
+      const offsetX = Math.floor((4 - shape[0].length) / 2);
+      const offsetY = Math.floor((4 - shape.length) / 2);
+      shape.forEach((row, dy) => {
+        row.forEach((value, dx) => {
+          if (value) {
+            const x = offsetX + dx;
+            const y = offsetY + dy;
+            const index = y * 4 + x;
+            const cell = previewCells[index];
+            if (cell) {
+              cell.className = "preview-cell filled";
+              cell.style.background = nextPiece.color;
+            }
+          }
+        });
+      });
+    }
+
+    document.addEventListener("keydown", event => {
+      if (!isRunning) return;
+      switch (event.key) {
+        case "ArrowLeft":
+          movePiece(-1);
+          break;
+        case "ArrowRight":
+          movePiece(1);
+          break;
+        case "ArrowUp":
+          changePiece();
+          break;
+        case "ArrowDown":
+          if (isValidPosition(currentPiece, 0, 1)) {
+            currentPiece.y++;
+          }
+          break;
+        case " ":
+          event.preventDefault();
+          hardDrop();
+          break;
+      }
+      draw();
+    });
+
+    startButton.addEventListener("click", startGame);
+    createGrid();
+    createPreviewGrid();
+    draw();
+  </script>
+</body>
+</html>
